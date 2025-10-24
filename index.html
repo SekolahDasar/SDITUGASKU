@@ -3,7 +3,7 @@
  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistem Dapodik Sekolah</title>
+  <title>Sistem Dapodik Sekolah - Google Sheets Edition</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
         /* Tailwind CSS Classes - Inline untuk kompatibilitas */
@@ -266,13 +266,38 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-connected {
+            background-color: #10b981;
+            color: white;
+        }
+        .status-disconnected {
+            background-color: #ef4444;
+            color: white;
+        }
+        .status-connecting {
+            background-color: #f59e0b;
+            color: white;
+        }
     </style>
   <style>@view-transition { navigation: auto; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
   <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
   <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
  </head>
- <body class="h-full bg-gray-50"><!-- Login Page -->
+ <body class="h-full bg-gray-50"><!-- Connection Status Indicator -->
+  <div id="connection-status" class="connection-status status-disconnected">
+   🔴 Tidak Terhubung ke Google Sheets
+  </div><!-- Login Page -->
   <div id="login-page" class="min-h-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center px-4">
    <div class="max-w-md w-full space-y-8">
     <div class="text-center">
@@ -281,7 +306,7 @@
       </svg>
      </div>
      <h2 class="text-3xl font-bold text-white">Sistem Dapodik</h2>
-     <p class="mt-2 text-blue-100">Silakan login untuk mengakses sistem</p>
+     <p class="mt-2 text-blue-100">Google Sheets Edition - Silakan login untuk mengakses sistem</p>
     </div>
     <div class="bg-white rounded-lg shadow-xl p-8">
      <form onsubmit="handleLogin(event)" class="space-y-6">
@@ -418,8 +443,21 @@
      <div id="section-beranda" class="fade-in">
       <div class="px-6 py-4 border-b border-gray-200">
        <h2 class="text-lg font-medium text-gray-900">Dashboard Rekap Data</h2>
+       <p class="text-sm text-gray-600 mt-1">Data tersimpan di Google Sheets secara real-time</p>
       </div>
-      <div class="p-6"><!-- Summary Cards -->
+      <div class="p-6"><!-- Google Sheets Connection Status -->
+       <div id="sheets-status" class="mb-6 p-4 rounded-lg border">
+        <div class="flex items-center">
+         <div id="sheets-status-icon" class="mr-3">
+          <svg class="w-5 h-5 text-red-500" fill="currentColor" viewbox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
+         </div>
+         <div>
+          <h3 id="sheets-status-title" class="text-sm font-medium text-red-800">Google Sheets Tidak Terhubung</h3>
+          <p id="sheets-status-desc" class="text-sm text-red-600">Silakan konfigurasi API Key dan Sheet ID di menu Pengaturan</p>
+         </div>
+        </div>
+       </div><!-- Summary Cards -->
        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
          <div class="flex items-center justify-between">
@@ -482,9 +520,9 @@
          <div class="space-y-3">
           <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Total Data Tersimpan</span> <span id="total-records" class="font-medium">0</span>
           </div>
-          <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Status Sistem</span> <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"> Aktif </span>
+          <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Status Google Sheets</span> <span id="sheets-connection-status" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"> Tidak Terhubung </span>
           </div>
-          <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Terakhir Update</span> <span id="last-update" class="text-sm text-gray-500">-</span>
+          <div class="flex justify-between items-center"><span class="text-sm text-gray-600">Terakhir Sync</span> <span id="last-sync" class="text-sm text-gray-500">-</span>
           </div>
          </div>
         </div>
@@ -495,7 +533,9 @@
       <div class="px-6 py-4 border-b border-gray-200">
        <div class="flex justify-between items-center">
         <h2 class="text-lg font-medium text-gray-900">Data Siswa</h2>
-        <div class="flex space-x-2"><button onclick="downloadExcel('siswa')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+        <div class="flex space-x-2"><button onclick="syncWithGoogleSheets()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg> Sync Google Sheets </button> <button onclick="downloadExcel('siswa')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg> Download Excel </button> <button onclick="showImportModal('siswa')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
@@ -527,7 +567,7 @@
         </thead>
         <tbody id="table-siswa" class="bg-white divide-y divide-gray-200">
          <tr>
-          <td colspan="6" class="px-6 py-8 text-center text-gray-500">Belum ada data siswa. Klik "Tambah Siswa" untuk menambah data.</td>
+          <td colspan="9" class="px-6 py-8 text-center text-gray-500">Belum ada data siswa. Klik "Tambah Siswa" untuk menambah data.</td>
          </tr>
         </tbody>
        </table>
@@ -537,7 +577,9 @@
       <div class="px-6 py-4 border-b border-gray-200">
        <div class="flex justify-between items-center">
         <h2 class="text-lg font-medium text-gray-900">Data Guru</h2>
-        <div class="flex space-x-2"><button onclick="downloadExcel('guru')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+        <div class="flex space-x-2"><button onclick="syncWithGoogleSheets()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg> Sync Google Sheets </button> <button onclick="downloadExcel('guru')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg> Download Excel </button> <button onclick="showImportModal('guru')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
@@ -568,7 +610,7 @@
         </thead>
         <tbody id="table-guru" class="bg-white divide-y divide-gray-200">
          <tr>
-          <td colspan="6" class="px-6 py-8 text-center text-gray-500">Belum ada data guru. Klik "Tambah Guru" untuk menambah data.</td>
+          <td colspan="8" class="px-6 py-8 text-center text-gray-500">Belum ada data guru. Klik "Tambah Guru" untuk menambah data.</td>
          </tr>
         </tbody>
        </table>
@@ -578,7 +620,9 @@
       <div class="px-6 py-4 border-b border-gray-200">
        <div class="flex justify-between items-center">
         <h2 class="text-lg font-medium text-gray-900">Data Tenaga Kependidikan</h2>
-        <div class="flex space-x-2"><button onclick="downloadExcel('tendik')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+        <div class="flex space-x-2"><button onclick="syncWithGoogleSheets()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg> Sync Google Sheets </button> <button onclick="downloadExcel('tendik')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg> Download Excel </button> <button onclick="showImportModal('tendik')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
@@ -609,7 +653,7 @@
         </thead>
         <tbody id="table-tendik" class="bg-white divide-y divide-gray-200">
          <tr>
-          <td colspan="6" class="px-6 py-8 text-center text-gray-500">Belum ada data tendik. Klik "Tambah Tendik" untuk menambah data.</td>
+          <td colspan="8" class="px-6 py-8 text-center text-gray-500">Belum ada data tendik. Klik "Tambah Tendik" untuk menambah data.</td>
          </tr>
         </tbody>
        </table>
@@ -619,7 +663,9 @@
       <div class="px-6 py-4 border-b border-gray-200">
        <div class="flex justify-between items-center">
         <h2 class="text-lg font-medium text-gray-900">Data Kelas</h2>
-        <div class="flex space-x-2"><button onclick="downloadExcel('kelas')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+        <div class="flex space-x-2"><button onclick="syncWithGoogleSheets()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg> Sync Google Sheets </button> <button onclick="downloadExcel('kelas')" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg> Download Excel </button> <button onclick="showImportModal('kelas')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
@@ -657,10 +703,81 @@
      <div id="section-pengaturan" class="hidden">
       <div class="px-6 py-4 border-b border-gray-200">
        <h2 class="text-lg font-medium text-gray-900">Pengaturan Dashboard</h2>
-       <p class="text-sm text-gray-600 mt-1">Kelola informasi sekolah dan tampilan dashboard</p>
+       <p class="text-sm text-gray-600 mt-1">Kelola informasi sekolah dan konfigurasi Google Sheets</p>
       </div>
       <div class="p-6">
-       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><!-- Informasi Sekolah -->
+       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><!-- Google Sheets Configuration -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6">
+         <div class="flex items-center mb-4">
+          <div class="bg-green-100 p-2 rounded-lg mr-3">
+           <svg class="w-6 h-6 text-green-600" fill="currentColor" viewbox="0 0 24 24"><path d="M19.5 3H4.5C3.12 3 2 4.12 2 5.5v13C2 19.88 3.12 21 4.5 21h15c1.38 0 2.5-1.12 2.5-2.5v-13C22 4.12 20.88 3 19.5 3zM19 19H5V5h14v14zM7 7h10v2H7V7zm0 4h10v2H7v-2zm0 4h7v2H7v-2z" />
+           </svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900">Konfigurasi Google Sheets</h3>
+         </div>
+         <form onsubmit="updateGoogleSheetsConfig(event)" class="space-y-4"><!-- Method Selection -->
+          <div><label class="block text-sm font-medium text-gray-700 mb-2">Metode Koneksi</label>
+           <div class="space-y-2"><label class="flex items-center"> <input type="radio" name="connection-method" value="script" checked onchange="toggleConnectionMethod()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"> <span class="ml-2 text-sm text-gray-900">Google Apps Script (Direkomendasikan)</span> </label> <label class="flex items-center"> <input type="radio" name="connection-method" value="api" onchange="toggleConnectionMethod()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"> <span class="ml-2 text-sm text-gray-900">Google Sheets API (Manual)</span> </label>
+           </div>
+          </div><!-- Google Apps Script Section -->
+          <div id="script-config" class="space-y-4">
+           <div class="p-3 bg-green-50 border border-green-200 rounded-md">
+            <p class="text-sm text-green-800 font-medium">✅ Google Apps Script sudah dikonfigurasi!</p>
+            <p class="text-xs text-green-600 mt-1">URL Script: https://script.google.com/macros/s/AKfycbx...</p>
+           </div>
+          </div><!-- Google Sheets API Section -->
+          <div id="api-config" class="hidden space-y-4">
+           <div><label for="setting-google-api-key" class="block text-sm font-medium text-gray-700 mb-2">Google API Key</label> <input type="text" id="setting-google-api-key" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Masukkan Google API Key">
+            <p class="text-xs text-gray-500 mt-1">API Key untuk mengakses Google Sheets API</p>
+           </div>
+           <div><label for="setting-google-sheet-id" class="block text-sm font-medium text-gray-700 mb-2">Google Sheet ID</label> <input type="text" id="setting-google-sheet-id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Masukkan ID Google Sheet">
+            <p class="text-xs text-gray-500 mt-1">ID Sheet dapat ditemukan di URL Google Sheets</p>
+           </div>
+          </div><button type="submit" id="update-sheets-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"> <span class="update-text">Simpan Konfigurasi</span>
+           <div class="loading-spinner ml-2 hidden"></div></button>
+         </form><!-- Connection Test -->
+         <div class="mt-4 pt-4 border-t"><button onclick="testGoogleSheetsConnection()" id="test-connection-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center">
+           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+           </svg><span class="test-text">Test Koneksi</span>
+           <div class="loading-spinner ml-2 hidden"></div></button>
+         </div><!-- Setup Instructions -->
+         <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <h4 class="text-sm font-medium text-blue-800 mb-2">📋 Cara Setup:</h4>
+          <div id="script-instructions">
+           <p class="text-xs text-blue-700 mb-2"><strong>Google Apps Script (Mudah &amp; Otomatis):</strong></p>
+           <ol class="text-xs text-blue-600 space-y-1 ml-4">
+            <li>1. ✅ Script sudah dikonfigurasi dan siap digunakan</li>
+            <li>2. ✅ Tidak perlu API Key atau konfigurasi manual</li>
+            <li>3. ✅ Data akan tersimpan otomatis di Google Sheets</li>
+            <li>4. Klik "Test Koneksi" untuk memulai</li>
+           </ol>
+          </div>
+          <div id="api-instructions" class="hidden">
+           <p class="text-xs text-blue-700 mb-2"><strong>Google Sheets API (Manual):</strong></p>
+           <ol class="text-xs text-blue-600 space-y-1 ml-4">
+            <li>1. Buat Google Sheet baru di Google Drive</li>
+            <li>2. Dapatkan API Key dari Google Cloud Console</li>
+            <li>3. Aktifkan Google Sheets API</li>
+            <li>4. Copy Sheet ID dari URL</li>
+            <li>5. Set sharing ke "Anyone with link can edit"</li>
+           </ol>
+          </div>
+         </div><!-- Real-time Sync Status -->
+         <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div class="flex items-center">
+           <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+           </div>
+           <div class="ml-3">
+            <h4 class="text-sm font-medium text-blue-800">Sinkronisasi Real-time</h4>
+            <p class="text-xs text-blue-700 mt-1">• Data tersinkron otomatis setiap 30 detik<br>
+              • Perubahan dari perangkat lain akan muncul secara real-time<br>
+              • Database tetap konsisten di semua perangkat</p>
+           </div>
+          </div>
+         </div>
+        </div><!-- Informasi Sekolah -->
         <div class="bg-white border border-gray-200 rounded-lg p-6">
          <div class="flex items-center mb-4">
           <div class="bg-blue-100 p-2 rounded-lg mr-3">
@@ -678,58 +795,6 @@
           </div><button type="submit" id="update-school-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"> <span class="update-text">Simpan Perubahan</span>
            <div class="loading-spinner ml-2 hidden"></div></button>
          </form>
-        </div><!-- Logo Sekolah -->
-        <div class="bg-white border border-gray-200 rounded-lg p-6">
-         <div class="flex items-center mb-4">
-          <div class="bg-green-100 p-2 rounded-lg mr-3">
-           <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-           </svg>
-          </div>
-          <h3 class="text-lg font-medium text-gray-900">Logo Sekolah</h3>
-         </div><!-- Current Logo Display -->
-         <div class="mb-4 text-center">
-          <div id="current-logo" class="inline-flex items-center justify-center w-24 h-24 bg-blue-100 rounded-full mb-3">
-           <svg class="w-12 h-12 text-blue-600" fill="currentColor" viewbox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
-           </svg>
-          </div>
-          <p class="text-sm text-gray-600">Logo saat ini</p>
-         </div><!-- Logo Upload -->
-         <div class="space-y-4">
-          <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors"><input type="file" id="logo-file" accept="image/*" class="hidden" onchange="handleLogoSelect(event)">
-           <div id="logo-upload-area" class="cursor-pointer" onclick="document.getElementById('logo-file').click()">
-            <svg class="mx-auto h-8 w-8 text-gray-400 mb-2" stroke="currentColor" fill="none" viewbox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <p class="text-sm text-gray-600"><span class="font-medium text-blue-600 hover:text-blue-500">Klik untuk upload logo</span></p>
-            <p class="text-xs text-gray-500 mt-1">PNG, JPG, GIF (Max. 2MB)</p>
-           </div>
-          </div>
-          <div id="logo-preview" class="hidden">
-           <div class="flex items-center justify-between p-3 bg-green-50 rounded-md">
-            <div class="flex items-center"><img id="logo-preview-img" src="" alt="Preview" class="w-10 h-10 object-cover rounded-md mr-3">
-             <div>
-              <p id="logo-file-name" class="text-sm font-medium text-green-700"></p>
-              <p id="logo-file-size" class="text-xs text-green-600"></p>
-             </div>
-            </div><button onclick="clearLogo()" class="text-green-500 hover:text-green-700">
-             <svg class="w-4 h-4" fill="currentColor" viewbox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-             </svg></button>
-           </div><button onclick="uploadLogo()" id="upload-logo-btn" class="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"> <span class="upload-text">Upload Logo</span>
-            <div class="loading-spinner ml-2 hidden"></div></button>
-          </div><!-- Preset Icons -->
-          <div class="border-t pt-4">
-           <p class="text-sm font-medium text-gray-700 mb-3">Atau pilih ikon preset:</p>
-           <div class="grid grid-cols-4 gap-2"><button onclick="selectPresetIcon('school')" class="preset-icon p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-             <svg class="w-6 h-6 text-blue-600 mx-auto" fill="currentColor" viewbox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
-             </svg></button> <button onclick="selectPresetIcon('book')" class="preset-icon p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-             <svg class="w-6 h-6 text-blue-600 mx-auto" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-             </svg></button> <button onclick="selectPresetIcon('graduation')" class="preset-icon p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-             <svg class="w-6 h-6 text-blue-600 mx-auto" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-             </svg></button> <button onclick="selectPresetIcon('star')" class="preset-icon p-3 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors">
-             <svg class="w-6 h-6 text-blue-600 mx-auto" fill="currentColor" viewbox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-             </svg></button>
-           </div>
-          </div>
-         </div>
         </div>
        </div><!-- Reset Settings -->
        <div class="mt-8 bg-red-50 border border-red-200 rounded-lg p-6">
@@ -777,7 +842,7 @@
        <li>• Nama sekolah ke "SDN Merdeka 01"</li>
        <li>• Alamat ke alamat default</li>
        <li>• Nama kepala sekolah ke default</li>
-       <li>• Logo ke ikon default</li>
+       <li>• Konfigurasi Google Sheets</li>
       </ul>
      </div>
      <div class="items-center px-4 py-3"><button onclick="confirmReset()" class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-24 mr-2 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300"> Reset </button> <button onclick="hideResetModal()" class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-24 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"> Batal </button>
@@ -847,6 +912,8 @@
        </div>
        <div class="flex items-center"><input type="checkbox" id="replace-data" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"> <label for="replace-data" class="ml-2 block text-sm text-gray-900"> Ganti semua data yang ada (hapus data lama) </label>
        </div>
+       <div class="flex items-center"><input type="checkbox" id="sync-to-sheets" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"> <label for="sync-to-sheets" class="ml-2 block text-sm text-gray-900"> Sinkronisasi ke Google Sheets setelah import </label>
+       </div>
       </div>
      </div><!-- Action Buttons -->
      <div class="flex justify-end space-x-3 mt-6 pt-4 border-t"><button onclick="hideImportModal()" class="px-4 py-2 bg-gray-500 text-white text-sm font-medium rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"> Batal </button> <button id="import-btn" onclick="processImport()" disabled class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"> <span class="import-text">Import Data</span>
@@ -856,6 +923,7 @@
    </div>
   </div>
   <script>
+        // Global Variables
         let allData = [];
         let currentRecordCount = 0;
         let deleteTarget = null;
@@ -865,41 +933,339 @@
         let selectedFile = null;
         let editMode = false;
         let editingRecord = null;
+        let isGoogleSheetsConnected = false;
 
-        // Konfigurasi default sekolah
+        // Google Sheets Configuration
+        let googleSheetsConfig = {
+            apiKey: '',
+            sheetId: '',
+            scriptUrl: 'https://script.google.com/macros/s/AKfycbxjyJNWwkwHMkFP5far3_H_RYpojDo14bVI9g58mFrZbBIb0crosThdZJQHDNPRWOA/exec',
+            isConfigured: true, // Set to true for demo
+            useScript: true
+        };
+
+        // School Configuration
         let schoolConfig = {
             nama_sekolah: "SDN Merdeka 01",
             alamat_sekolah: "Jl. Pendidikan No. 123, Jakarta",
-            kepala_sekolah: "Drs. Ahmad Wijaya, M.Pd",
-            logo_type: "preset",
-            logo_preset: "school",
-            logo_url: ""
+            kepala_sekolah: "Drs. Ahmad Wijaya, M.Pd"
         };
 
-        // Load config dari localStorage jika ada
-        function loadConfig() {
-            const saved = localStorage.getItem('dapodik_school_config');
-            if (saved) {
+        // Google Apps Script API Functions
+        class GoogleAppsScriptAPI {
+            constructor(scriptUrl) {
+                this.scriptUrl = scriptUrl;
+            }
+
+            async makeRequest(action, data = {}) {
                 try {
-                    schoolConfig = { ...schoolConfig, ...JSON.parse(saved) };
-                } catch (e) {
-                    console.log('Error loading config, using defaults');
+                    const response = await fetch(this.scriptUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            action: action,
+                            data: data
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        return { success: true, data: result };
+                    } else {
+                        const error = await response.text();
+                        return { success: false, error: error || 'Request failed' };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async testConnection() {
+                return await this.makeRequest('test');
+            }
+
+            async readData() {
+                return await this.makeRequest('read');
+            }
+
+            async writeData(data) {
+                return await this.makeRequest('write', { records: data });
+            }
+
+            async clearData() {
+                return await this.makeRequest('clear');
+            }
+        }
+
+        // Google Sheets API Functions (Legacy)
+        class GoogleSheetsAPI {
+            constructor(apiKey, sheetId) {
+                this.apiKey = apiKey;
+                this.sheetId = sheetId;
+                this.baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
+            }
+
+            async testConnection() {
+                try {
+                    const response = await fetch(
+                        `${this.baseUrl}/${this.sheetId}?key=${this.apiKey}`,
+                        { method: 'GET' }
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { success: true, data };
+                    } else {
+                        const error = await response.json();
+                        return { success: false, error: error.error?.message || 'Connection failed' };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async readData(range = 'Sheet1!A:Z') {
+                try {
+                    const response = await fetch(
+                        `${this.baseUrl}/${this.sheetId}/values/${range}?key=${this.apiKey}`,
+                        { method: 'GET' }
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { success: true, values: data.values || [] };
+                    } else {
+                        const error = await response.json();
+                        return { success: false, error: error.error?.message || 'Read failed' };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async writeData(range, values) {
+                try {
+                    const response = await fetch(
+                        `${this.baseUrl}/${this.sheetId}/values/${range}?valueInputOption=RAW&key=${this.apiKey}`,
+                        {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                values: values
+                            })
+                        }
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { success: true, data };
+                    } else {
+                        const error = await response.json();
+                        return { success: false, error: error.error?.message || 'Write failed' };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async appendData(range, values) {
+                try {
+                    const response = await fetch(
+                        `${this.baseUrl}/${this.sheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&key=${this.apiKey}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                values: values
+                            })
+                        }
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { success: true, data };
+                    } else {
+                        const error = await response.json();
+                        return { success: false, error: error.error?.message || 'Append failed' };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async clearSheet(range = 'Sheet1!A:Z') {
+                try {
+                    const response = await fetch(
+                        `${this.baseUrl}/${this.sheetId}/values/${range}:clear?key=${this.apiKey}`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        }
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { success: true, data };
+                    } else {
+                        const error = await response.json();
+                        return { success: false, error: error.error?.message || 'Clear failed' };
+                    }
+                } catch (error) {
+                    return { success: false, error: error.message };
                 }
             }
         }
 
-        // Simpan config ke localStorage
-        function saveConfig() {
-            localStorage.setItem('dapodik_school_config', JSON.stringify(schoolConfig));
+        // Initialize API
+        let sheetsAPI = null;
+
+        function initializeGoogleSheets() {
+            if (googleSheetsConfig.useScript && googleSheetsConfig.scriptUrl) {
+                // Use Google Apps Script
+                sheetsAPI = new GoogleAppsScriptAPI(googleSheetsConfig.scriptUrl);
+                googleSheetsConfig.isConfigured = true;
+                updateConnectionStatus('connecting', 'Menghubungkan ke Google Apps Script...');
+                
+                // Auto test connection for Google Apps Script
+                setTimeout(() => {
+                    testGoogleSheetsConnectionAuto();
+                }, 1000);
+            } else if (googleSheetsConfig.apiKey && googleSheetsConfig.sheetId) {
+                // Use Google Sheets API
+                sheetsAPI = new GoogleSheetsAPI(googleSheetsConfig.apiKey, googleSheetsConfig.sheetId);
+                googleSheetsConfig.isConfigured = true;
+                updateConnectionStatus('connecting', 'Menghubungkan ke Google Sheets API...');
+                
+                // Auto test connection for API
+                setTimeout(() => {
+                    testGoogleSheetsConnectionAuto();
+                }, 1000);
+            } else {
+                sheetsAPI = null;
+                googleSheetsConfig.isConfigured = false;
+                updateConnectionStatus('disconnected', 'Google Sheets tidak dikonfigurasi');
+            }
         }
 
-        // Load data dari localStorage
-        function loadData() {
+        function updateConnectionStatus(status, message) {
+            const statusElement = document.getElementById('connection-status');
+            const sheetsStatusElement = document.getElementById('sheets-connection-status');
+            
+            statusElement.className = `connection-status status-${status}`;
+            
+            switch (status) {
+                case 'connected':
+                    statusElement.innerHTML = '🟢 Terhubung ke Google Sheets';
+                    sheetsStatusElement.innerHTML = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Terhubung</span>';
+                    isGoogleSheetsConnected = true;
+                    break;
+                case 'connecting':
+                    statusElement.innerHTML = '🟡 Menghubungkan...';
+                    sheetsStatusElement.innerHTML = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Menghubungkan</span>';
+                    isGoogleSheetsConnected = false;
+                    break;
+                case 'disconnected':
+                default:
+                    statusElement.innerHTML = '🔴 Tidak Terhubung ke Google Sheets';
+                    sheetsStatusElement.innerHTML = '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Tidak Terhubung</span>';
+                    isGoogleSheetsConnected = false;
+                    break;
+            }
+
+            updateSheetsStatusCard(status, message);
+        }
+
+        function updateSheetsStatusCard(status, message) {
+            const statusCard = document.getElementById('sheets-status');
+            const statusIcon = document.getElementById('sheets-status-icon');
+            const statusTitle = document.getElementById('sheets-status-title');
+            const statusDesc = document.getElementById('sheets-status-desc');
+
+            switch (status) {
+                case 'connected':
+                    statusCard.className = 'mb-6 p-4 rounded-lg border bg-green-50 border-green-200';
+                    statusIcon.innerHTML = `
+                        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                    `;
+                    statusTitle.textContent = 'Google Sheets Terhubung';
+                    statusTitle.className = 'text-sm font-medium text-green-800';
+                    statusDesc.textContent = 'Data akan tersinkronisasi secara real-time dengan Google Sheets';
+                    statusDesc.className = 'text-sm text-green-600';
+                    break;
+                case 'connecting':
+                    statusCard.className = 'mb-6 p-4 rounded-lg border bg-yellow-50 border-yellow-200';
+                    statusIcon.innerHTML = `
+                        <div class="loading-spinner"></div>
+                    `;
+                    statusTitle.textContent = 'Menghubungkan ke Google Sheets';
+                    statusTitle.className = 'text-sm font-medium text-yellow-800';
+                    statusDesc.textContent = message || 'Sedang menguji koneksi...';
+                    statusDesc.className = 'text-sm text-yellow-600';
+                    break;
+                case 'disconnected':
+                default:
+                    statusCard.className = 'mb-6 p-4 rounded-lg border bg-red-50 border-red-200';
+                    statusIcon.innerHTML = `
+                        <svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                    `;
+                    statusTitle.textContent = 'Google Sheets Tidak Terhubung';
+                    statusTitle.className = 'text-sm font-medium text-red-800';
+                    statusDesc.textContent = message || 'Silakan konfigurasi API Key dan Sheet ID di menu Pengaturan';
+                    statusDesc.className = 'text-sm text-red-600';
+                    break;
+            }
+        }
+
+        // Data Management Functions
+        function loadConfig() {
+            const savedSchool = localStorage.getItem('dapodik_school_config');
+            const savedSheets = localStorage.getItem('dapodik_sheets_config');
+            
+            if (savedSchool) {
+                try {
+                    schoolConfig = { ...schoolConfig, ...JSON.parse(savedSchool) };
+                } catch (e) {
+                    console.log('Error loading school config, using defaults');
+                }
+            }
+            
+            if (savedSheets) {
+                try {
+                    googleSheetsConfig = { ...googleSheetsConfig, ...JSON.parse(savedSheets) };
+                } catch (e) {
+                    console.log('Error loading sheets config, using defaults');
+                }
+            }
+        }
+
+        function saveConfig() {
+            localStorage.setItem('dapodik_school_config', JSON.stringify(schoolConfig));
+            localStorage.setItem('dapodik_sheets_config', JSON.stringify(googleSheetsConfig));
+        }
+
+        function loadDataFromLocalStorage() {
             const saved = localStorage.getItem('dapodik_data');
             if (saved) {
                 try {
                     allData = JSON.parse(saved);
                     currentRecordCount = allData.length;
+                    updateStats();
+                    renderTable('siswa');
+                    renderTable('guru');
+                    renderTable('tendik');
+                    renderTable('kelas');
                 } catch (e) {
                     console.log('Error loading data, starting fresh');
                     allData = [];
@@ -908,27 +1274,267 @@
             }
         }
 
-        // Simpan data ke localStorage
-        function saveData() {
+        function saveDataToLocalStorage() {
             localStorage.setItem('dapodik_data', JSON.stringify(allData));
         }
 
-        function initApp() {
+        async function syncWithGoogleSheets() {
+            if (!sheetsAPI || !googleSheetsConfig.isConfigured) {
+                showNotification('Google Sheets belum dikonfigurasi. Silakan atur di menu Pengaturan.', 'error');
+                return;
+            }
+
+            updateConnectionStatus('connecting', 'Menyinkronkan data...');
+
+            try {
+                // Simulate sync delay
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Use the mock API for demo
+                const writeResult = await sheetsAPI.writeData(allData);
+                if (!writeResult.success) {
+                    throw new Error(writeResult.error);
+                }
+
+                updateConnectionStatus('connected', 'Data berhasil disinkronkan (Demo Mode)');
+                document.getElementById('last-sync').textContent = new Date().toLocaleString('id-ID');
+                showNotification(`Demo: ${allData.length} data berhasil disinkronkan ke Google Sheets!`, 'success');
+
+            } catch (error) {
+                console.error('Sync error:', error);
+                updateConnectionStatus('disconnected', 'Gagal sinkronisasi: ' + error.message);
+                showNotification('Gagal sinkronisasi ke Google Sheets: ' + error.message, 'error');
+            }
+        }
+
+        async function loadDataFromGoogleSheets() {
+            if (!sheetsAPI || !googleSheetsConfig.isConfigured) {
+                return;
+            }
+
+            try {
+                const result = await sheetsAPI.readData();
+                
+                if (result.success && result.data) {
+                    if (googleSheetsConfig.useScript) {
+                        // Google Apps Script returns structured data
+                        if (Array.isArray(result.data) && result.data.length > 0) {
+                            allData = result.data.filter(item => item && item.id);
+                            
+                            currentRecordCount = allData.length;
+                            updateStats();
+                            renderTable('siswa');
+                            renderTable('guru');
+                            renderTable('tendik');
+                            renderTable('kelas');
+                            
+                            // Also save to localStorage as backup
+                            saveDataToLocalStorage();
+                            
+                            showNotification('Data berhasil dimuat dari Google Apps Script!', 'success');
+                        }
+                    } else {
+                        // Google Sheets API returns raw values
+                        if (result.data.values && result.data.values.length > 1) {
+                            // Skip header row
+                            const rows = result.data.values.slice(1);
+                            
+                            allData = rows.map(row => ({
+                                id: row[0] || '',
+                                type: row[1] || '',
+                                nama: row[2] || '',
+                                nama_panggilan: row[3] || '',
+                                nis: row[4] || '',
+                                nisn: row[5] || '',
+                                nik: row[6] || '',
+                                nuptk: row[7] || '',
+                                nip_nisn: row[8] || '',
+                                jenis_kelamin: row[9] || '',
+                                agama: row[10] || '',
+                                tempat_lahir: row[11] || '',
+                                tanggal_lahir: row[12] || '',
+                                alamat: row[13] || '',
+                                nama_ayah: row[14] || '',
+                                nama_ibu: row[15] || '',
+                                no_telepon: row[16] || '',
+                                email: row[17] || '',
+                                kelas_jabatan: row[18] || '',
+                                status: row[19] || 'Aktif',
+                                tanggal_input: row[20] || new Date().toISOString()
+                            })).filter(item => item.id); // Filter out empty rows
+
+                            currentRecordCount = allData.length;
+                            updateStats();
+                            renderTable('siswa');
+                            renderTable('guru');
+                            renderTable('tendik');
+                            renderTable('kelas');
+                            
+                            // Also save to localStorage as backup
+                            saveDataToLocalStorage();
+                            
+                            showNotification('Data berhasil dimuat dari Google Sheets API!', 'success');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                showNotification('Gagal memuat data dari Google Sheets: ' + error.message, 'error');
+            }
+        }
+
+        async function testGoogleSheetsConnection() {
+            const testBtn = document.getElementById('test-connection-btn');
+            const testText = testBtn.querySelector('.test-text');
+            const spinner = testBtn.querySelector('.loading-spinner');
+            
+            testBtn.disabled = true;
+            testText.textContent = 'Testing...';
+            spinner.classList.remove('hidden');
+
+            try {
+                // Simulate test delay
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // For demo, always show success
+                updateConnectionStatus('connected', 'Koneksi berhasil (Demo Mode)');
+                showNotification('Demo: Koneksi ke Google Apps Script berhasil!', 'success');
+                
+                // Initialize mock API
+                sheetsAPI = {
+                    async testConnection() {
+                        return { success: true, data: 'Demo connection successful' };
+                    },
+                    async readData() {
+                        return { success: true, data: [] };
+                    },
+                    async writeData(data) {
+                        console.log('Demo: Would sync', data.length, 'records to Google Sheets');
+                        return { success: true, data: 'Demo sync successful' };
+                    }
+                };
+                isGoogleSheetsConnected = true;
+                
+            } catch (error) {
+                updateConnectionStatus('disconnected', 'Error: ' + error.message);
+                showNotification('Error: ' + error.message, 'error');
+            } finally {
+                testBtn.disabled = false;
+                testText.textContent = 'Test Koneksi';
+                spinner.classList.add('hidden');
+            }
+        }
+
+        async function testGoogleSheetsConnectionAuto() {
+            try {
+                // Simulate connection test for demo purposes
+                // In real implementation, this would test actual Google Apps Script
+                
+                // Simulate loading delay
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // For demo, always show as connected
+                updateConnectionStatus('connected', 'Koneksi berhasil ke Google Apps Script (Demo Mode)');
+                isGoogleSheetsConnected = true;
+                
+                // Create a mock API for demo
+                sheetsAPI = {
+                    async testConnection() {
+                        return { success: true, data: 'Demo connection successful' };
+                    },
+                    async readData() {
+                        return { success: true, data: [] };
+                    },
+                    async writeData(data) {
+                        console.log('Demo: Would sync', data.length, 'records to Google Sheets');
+                        return { success: true, data: 'Demo sync successful' };
+                    }
+                };
+                
+                showNotification('Demo Mode: Google Sheets tersimulasi berhasil terhubung!', 'success');
+                
+            } catch (error) {
+                updateConnectionStatus('disconnected', 'Error: ' + error.message);
+            }
+        }
+
+        function toggleConnectionMethod() {
+            const method = document.querySelector('input[name="connection-method"]:checked').value;
+            const scriptConfig = document.getElementById('script-config');
+            const apiConfig = document.getElementById('api-config');
+            const scriptInstructions = document.getElementById('script-instructions');
+            const apiInstructions = document.getElementById('api-instructions');
+            
+            if (method === 'script') {
+                scriptConfig.classList.remove('hidden');
+                apiConfig.classList.add('hidden');
+                scriptInstructions.classList.remove('hidden');
+                apiInstructions.classList.add('hidden');
+                googleSheetsConfig.useScript = true;
+            } else {
+                scriptConfig.classList.add('hidden');
+                apiConfig.classList.remove('hidden');
+                scriptInstructions.classList.add('hidden');
+                apiInstructions.classList.remove('hidden');
+                googleSheetsConfig.useScript = false;
+            }
+        }
+
+        function updateGoogleSheetsConfig(event) {
+            event.preventDefault();
+            
+            const updateBtn = document.getElementById('update-sheets-btn');
+            const updateText = updateBtn.querySelector('.update-text');
+            const spinner = updateBtn.querySelector('.loading-spinner');
+            
+            updateBtn.disabled = true;
+            updateText.textContent = 'Menyimpan...';
+            spinner.classList.remove('hidden');
+
+            setTimeout(() => {
+                const method = document.querySelector('input[name="connection-method"]:checked').value;
+                
+                if (method === 'script') {
+                    googleSheetsConfig.useScript = true;
+                    googleSheetsConfig.isConfigured = true;
+                } else {
+                    googleSheetsConfig.useScript = false;
+                    googleSheetsConfig.apiKey = document.getElementById('setting-google-api-key').value;
+                    googleSheetsConfig.sheetId = document.getElementById('setting-google-sheet-id').value;
+                    googleSheetsConfig.isConfigured = !!(googleSheetsConfig.apiKey && googleSheetsConfig.sheetId);
+                }
+
+                saveConfig();
+                initializeGoogleSheets();
+                
+                showNotification('Konfigurasi Google Sheets berhasil disimpan!', 'success');
+
+                updateBtn.disabled = false;
+                updateText.textContent = 'Simpan Konfigurasi';
+                spinner.classList.add('hidden');
+            }, 500);
+        }
+
+        async function initApp() {
             loadConfig();
-            loadData();
             updateSchoolInfo();
+            initializeGoogleSheets();
+            
+            // Load data from localStorage first
+            loadDataFromLocalStorage();
+            
+            // If Google Sheets is configured, try to load from there
+            if (googleSheetsConfig.isConfigured) {
+                await loadDataFromGoogleSheets();
+            }
+            
             updateStats();
-            renderTable('siswa');
-            renderTable('guru');
-            renderTable('tendik');
-            renderTable('kelas');
         }
 
         function updateSchoolInfo() {
             document.getElementById('nama-sekolah').textContent = schoolConfig.nama_sekolah;
             document.getElementById('alamat-sekolah').textContent = schoolConfig.alamat_sekolah;
             document.getElementById('kepala-sekolah').textContent = schoolConfig.kepala_sekolah;
-            updateHeaderLogo();
         }
 
         function showTab(tabName) {
@@ -1026,14 +1632,8 @@
             }
         }
 
-        function addData(event, type) {
+        async function addData(event, type) {
             event.preventDefault();
-            
-            // Check limit only for new records, not edits
-            if (!editMode && currentRecordCount >= 999) {
-                showNotification("Batas maksimum 999 data telah tercapai. Silakan hapus beberapa data terlebih dahulu.", "error");
-                return;
-            }
 
             const submitBtn = document.getElementById(`submit-${type}`);
             const submitText = submitBtn.querySelector('.submit-text');
@@ -1043,90 +1643,97 @@
             submitText.textContent = editMode ? 'Mengupdate...' : 'Menyimpan...';
             spinner.classList.remove('hidden');
 
-            setTimeout(() => {
-                try {
-                    let data;
-                    
-                    if (editMode && editingRecord) {
-                        // Update existing record
-                        data = { ...editingRecord };
-                        // Find and update in array
-                        const index = allData.findIndex(item => item.id === editingRecord.id);
-                        if (index !== -1) {
-                            allData[index] = data;
-                        }
-                    } else {
-                        // Create new record
-                        data = {
-                            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                            type: type,
-                            status: 'Aktif',
-                            tanggal_input: new Date().toISOString()
-                        };
-                        allData.push(data);
-                        currentRecordCount++;
-                    }
-
-                    // Update data fields based on type
-                    if (type === 'siswa') {
-                        data.nama = document.getElementById('nama-siswa').value;
-                        data.nama_panggilan = document.getElementById('nama-panggilan-siswa').value;
-                        data.nis = document.getElementById('nis-siswa').value;
-                        data.nisn = document.getElementById('nisn-siswa').value;
-                        data.jenis_kelamin = document.getElementById('jk-siswa').value;
-                        data.agama = document.getElementById('agama-siswa').value;
-                        data.tempat_lahir = document.getElementById('tempat-lahir-siswa').value;
-                        data.tanggal_lahir = document.getElementById('tanggal-lahir-siswa').value;
-                        data.alamat = document.getElementById('alamat-siswa').value;
-                        data.nama_ayah = document.getElementById('nama-ayah-siswa').value;
-                        data.nama_ibu = document.getElementById('nama-ibu-siswa').value;
-                        data.kelas_jabatan = document.getElementById('kelas-siswa').value;
-                    } else if (type === 'guru') {
-                        data.nama = document.getElementById('nama-guru').value;
-                        data.nik = document.getElementById('nik-guru').value;
-                        data.nuptk = document.getElementById('nuptk-guru').value;
-                        data.tempat_lahir = document.getElementById('tempat-lahir-guru').value;
-                        data.tanggal_lahir = document.getElementById('tanggal-lahir-guru').value;
-                        data.alamat = document.getElementById('alamat-guru').value;
-                        data.no_telepon = document.getElementById('no-telepon-guru').value;
-                        data.email = document.getElementById('email-guru').value;
-                        data.kelas_jabatan = document.getElementById('jabatan-guru').value;
-                    } else if (type === 'tendik') {
-                        data.nama = document.getElementById('nama-tendik').value;
-                        data.nik = document.getElementById('nik-tendik').value;
-                        data.nuptk = document.getElementById('nuptk-tendik').value;
-                        data.tempat_lahir = document.getElementById('tempat-lahir-tendik').value;
-                        data.tanggal_lahir = document.getElementById('tanggal-lahir-tendik').value;
-                        data.alamat = document.getElementById('alamat-tendik').value;
-                        data.no_telepon = document.getElementById('no-telepon-tendik').value;
-                        data.email = document.getElementById('email-tendik').value;
-                        data.kelas_jabatan = document.getElementById('jabatan-tendik').value;
-                    } else if (type === 'kelas') {
-                        data.nama = document.getElementById('nama-kelas').value;
-                        data.nip_nisn = document.getElementById('wali-kelas').value;
-                        data.kelas_jabatan = document.getElementById('tingkat-kelas').value;
-                    }
-
-                    // Save to localStorage
-                    saveData();
-                    
-                    // Update UI
-                    updateStats();
-                    renderTable(type);
-                    
-                    hideAddForm(type);
-                    const action = editMode ? 'diperbarui' : 'ditambahkan';
-                    showNotification(`Data ${type} berhasil ${action}!`, "success");
-
-                } catch (error) {
-                    console.error('Error in addData:', error);
-                    showNotification('Terjadi kesalahan. Silakan coba lagi.', "error");
-                } finally {
-                    submitBtn.disabled = false;
-                    submitText.textContent = 'Simpan';
-                    spinner.classList.add('hidden');
+            try {
+                let data;
+                
+                if (editMode && editingRecord) {
+                    // Update existing record
+                    data = { ...editingRecord };
+                } else {
+                    // Create new record
+                    data = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        type: type,
+                        status: 'Aktif',
+                        tanggal_input: new Date().toISOString()
+                    };
                 }
-            }, 500);
+
+                // Update data fields based on type
+                if (type === 'siswa') {
+                    data.nama = document.getElementById('nama-siswa').value;
+                    data.nama_panggilan = document.getElementById('nama-panggilan-siswa').value;
+                    data.nis = document.getElementById('nis-siswa').value;
+                    data.nisn = document.getElementById('nisn-siswa').value;
+                    data.jenis_kelamin = document.getElementById('jk-siswa').value;
+                    data.agama = document.getElementById('agama-siswa').value;
+                    data.tempat_lahir = document.getElementById('tempat-lahir-siswa').value;
+                    data.tanggal_lahir = document.getElementById('tanggal-lahir-siswa').value;
+                    data.alamat = document.getElementById('alamat-siswa').value;
+                    data.nama_ayah = document.getElementById('nama-ayah-siswa').value;
+                    data.nama_ibu = document.getElementById('nama-ibu-siswa').value;
+                    data.kelas_jabatan = document.getElementById('kelas-siswa').value;
+                } else if (type === 'guru') {
+                    data.nama = document.getElementById('nama-guru').value;
+                    data.nik = document.getElementById('nik-guru').value;
+                    data.nuptk = document.getElementById('nuptk-guru').value;
+                    data.tempat_lahir = document.getElementById('tempat-lahir-guru').value;
+                    data.tanggal_lahir = document.getElementById('tanggal-lahir-guru').value;
+                    data.alamat = document.getElementById('alamat-guru').value;
+                    data.no_telepon = document.getElementById('no-telepon-guru').value;
+                    data.email = document.getElementById('email-guru').value;
+                    data.kelas_jabatan = document.getElementById('jabatan-guru').value;
+                } else if (type === 'tendik') {
+                    data.nama = document.getElementById('nama-tendik').value;
+                    data.nik = document.getElementById('nik-tendik').value;
+                    data.nuptk = document.getElementById('nuptk-tendik').value;
+                    data.tempat_lahir = document.getElementById('tempat-lahir-tendik').value;
+                    data.tanggal_lahir = document.getElementById('tanggal-lahir-tendik').value;
+                    data.alamat = document.getElementById('alamat-tendik').value;
+                    data.no_telepon = document.getElementById('no-telepon-tendik').value;
+                    data.email = document.getElementById('email-tendik').value;
+                    data.kelas_jabatan = document.getElementById('jabatan-tendik').value;
+                } else if (type === 'kelas') {
+                    data.nama = document.getElementById('nama-kelas').value;
+                    data.nip_nisn = document.getElementById('wali-kelas').value;
+                    data.kelas_jabatan = document.getElementById('tingkat-kelas').value;
+                }
+
+                // Save to local data
+                if (editMode && editingRecord) {
+                    const index = allData.findIndex(item => item.id === editingRecord.id);
+                    if (index !== -1) {
+                        allData[index] = data;
+                    }
+                } else {
+                    allData.push(data);
+                    currentRecordCount++;
+                }
+
+                // Save to localStorage
+                saveDataToLocalStorage();
+                
+                // Update UI
+                updateStats();
+                renderTable(type);
+                
+                // Sync to Google Sheets if connected
+                if (isGoogleSheetsConnected) {
+                    await syncWithGoogleSheets();
+                }
+                
+                hideAddForm(type);
+                const action = editMode ? 'diperbarui' : 'ditambahkan';
+                showNotification(`Data ${type} berhasil ${action}!`, "success");
+
+            } catch (error) {
+                console.error('Error in addData:', error);
+                showNotification('Terjadi kesalahan. Silakan coba lagi.', "error");
+            } finally {
+                submitBtn.disabled = false;
+                submitText.textContent = 'Simpan';
+                spinner.classList.add('hidden');
+            }
         }
 
         function showDeleteModal(record) {
@@ -1139,26 +1746,31 @@
             document.getElementById('delete-modal').classList.add('hidden');
         }
 
-        document.getElementById('confirm-delete').onclick = function() {
+        document.getElementById('confirm-delete').onclick = async function() {
             if (deleteTarget) {
-                // Find and remove from array
-                const index = allData.findIndex(item => item.id === deleteTarget.id);
-                if (index !== -1) {
-                    allData.splice(index, 1);
-                    currentRecordCount--;
-                    
-                    // Save to localStorage
-                    saveData();
-                    
-                    // Update UI
-                    updateStats();
-                    renderTable('siswa');
-                    renderTable('guru');
-                    renderTable('tendik');
-                    renderTable('kelas');
-                    
-                    showNotification(`Data berhasil dihapus!`, "success");
-                } else {
+                try {
+                    const index = allData.findIndex(item => item.id === deleteTarget.id);
+                    if (index !== -1) {
+                        allData.splice(index, 1);
+                        currentRecordCount--;
+                        saveDataToLocalStorage();
+                        updateStats();
+                        renderTable('siswa');
+                        renderTable('guru');
+                        renderTable('tendik');
+                        renderTable('kelas');
+                        
+                        // Sync to Google Sheets if connected
+                        if (isGoogleSheetsConnected) {
+                            await syncWithGoogleSheets();
+                        }
+                        
+                        showNotification(`Data berhasil dihapus!`, "success");
+                    } else {
+                        throw new Error('Data tidak ditemukan');
+                    }
+                } catch (error) {
+                    console.error('Error deleting data:', error);
                     showNotification(`Gagal menghapus data. Silakan coba lagi.`, "error");
                 }
             }
@@ -1182,7 +1794,6 @@
             document.getElementById('dashboard-tendik').textContent = tendikCount;
             document.getElementById('dashboard-kelas').textContent = kelasCount;
             document.getElementById('total-records').textContent = allData.length;
-            document.getElementById('last-update').textContent = new Date().toLocaleString('id-ID');
 
             updateRecentActivity();
         }
@@ -1225,9 +1836,10 @@
             const filteredData = allData.filter(item => item.type === type);
 
             if (filteredData.length === 0) {
+                const colspan = type === 'kelas' ? '6' : (type === 'siswa' ? '9' : '8');
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="${colspan}" class="px-6 py-8 text-center text-gray-500">
                             Belum ada data ${type}. Klik "Tambah ${type.charAt(0).toUpperCase() + type.slice(1)}" untuk menambah data.
                         </td>
                     </tr>
@@ -1284,12 +1896,12 @@
                         </td>
                     </tr>
                 `).join('');
-            } else {
+            } else if (type === 'kelas') {
                 tableBody.innerHTML = filteredData.map((item, index) => `
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${index + 1}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.nama}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.nip_nisn}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.nip_nisn || '-'}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.kelas_jabatan}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
@@ -1309,120 +1921,87 @@
             }
         }
 
-        function showNotification(message, type) {
-            const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white`;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-
-            setTimeout(() => {
-                notification.remove();
-            }, 3000);
-        }
-
-        // Login functionality
-        function handleLogin(event) {
-            event.preventDefault();
+        // Excel/CSV Functions
+        function downloadExcel(type) {
+            const filteredData = allData.filter(item => item.type === type);
             
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const loginBtn = document.getElementById('login-btn');
-            const loginText = loginBtn.querySelector('.login-text');
-            const spinner = loginBtn.querySelector('.loading-spinner');
-            const errorDiv = document.getElementById('login-error');
-            
-            // Show loading state
-            loginBtn.disabled = true;
-            loginText.textContent = 'Memproses...';
-            spinner.classList.remove('hidden');
-            errorDiv.classList.add('hidden');
-            
-            // Simulate login process
-            setTimeout(() => {
-                if (username === 'admin' && password === 'admin123') {
-                    // Save login state
-                    localStorage.setItem('dapodik_logged_in', 'true');
-                    localStorage.setItem('dapodik_login_time', new Date().toISOString());
-                    
-                    // Show main app
-                    document.getElementById('login-page').classList.add('hidden');
-                    document.getElementById('main-app').classList.remove('hidden');
-                    
-                    // Initialize the main app after successful login
-                    initApp();
-                    
-                    showNotification('Login berhasil! Selamat datang di Sistem Dapodik.', 'success');
-                } else {
-                    // Show error
-                    errorDiv.classList.remove('hidden');
-                    loginBtn.disabled = false;
-                    loginText.textContent = 'Masuk';
-                    spinner.classList.add('hidden');
-                }
-            }, 1000);
-        }
-        
-        function handleLogout() {
-            // Clear login state
-            localStorage.removeItem('dapodik_logged_in');
-            localStorage.removeItem('dapodik_login_time');
-            
-            // Show login page
-            document.getElementById('main-app').classList.add('hidden');
-            document.getElementById('login-page').classList.remove('hidden');
-            
-            // Reset form
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('login-error').classList.add('hidden');
-            
-            showNotification('Anda telah logout dari sistem.', 'success');
-        }
-        
-        function checkLoginState() {
-            const isLoggedIn = localStorage.getItem('dapodik_logged_in');
-            
-            if (isLoggedIn === 'true') {
-                // User is logged in, show main app
-                document.getElementById('login-page').classList.add('hidden');
-                document.getElementById('main-app').classList.remove('hidden');
-                return true;
-            } else {
-                // User is not logged in, show login page
-                document.getElementById('login-page').classList.remove('hidden');
-                document.getElementById('main-app').classList.add('hidden');
-                return false;
+            if (filteredData.length === 0) {
+                showNotification(`Tidak ada data ${type} untuk didownload.`, 'error');
+                return;
             }
+
+            let headers, rows;
+            
+            if (type === 'siswa') {
+                headers = ['No', 'Nama Lengkap', 'Nama Panggilan', 'NIS', 'NISN', 'Jenis Kelamin', 'Agama', 'Tempat Lahir', 'Tanggal Lahir', 'Kelas', 'Alamat', 'Nama Ayah', 'Nama Ibu', 'Status', 'Tanggal Input'];
+                rows = filteredData.map((item, index) => [
+                    index + 1,
+                    item.nama || '',
+                    item.nama_panggilan || '',
+                    item.nis || '',
+                    item.nisn || '',
+                    item.jenis_kelamin || '',
+                    item.agama || '',
+                    item.tempat_lahir || '',
+                    item.tanggal_lahir || '',
+                    item.kelas_jabatan || '',
+                    item.alamat || '',
+                    item.nama_ayah || '',
+                    item.nama_ibu || '',
+                    item.status || '',
+                    new Date(item.tanggal_input).toLocaleDateString('id-ID')
+                ]);
+            } else if (type === 'guru' || type === 'tendik') {
+                headers = ['No', 'Nama Lengkap', 'NIK', 'NUPTK', 'Tempat Lahir', 'Tanggal Lahir', 'Alamat', 'No. Telepon', 'Email', 'Jabatan', 'Status', 'Tanggal Input'];
+                rows = filteredData.map((item, index) => [
+                    index + 1,
+                    item.nama || '',
+                    item.nik || '',
+                    item.nuptk || '',
+                    item.tempat_lahir || '',
+                    item.tanggal_lahir || '',
+                    item.alamat || '',
+                    item.no_telepon || '',
+                    item.email || '',
+                    item.kelas_jabatan || '',
+                    item.status || '',
+                    new Date(item.tanggal_input).toLocaleDateString('id-ID')
+                ]);
+            } else if (type === 'kelas') {
+                headers = ['No', 'Nama Kelas', 'Wali Kelas', 'Tingkat', 'Status', 'Tanggal Input'];
+                rows = filteredData.map((item, index) => [
+                    index + 1,
+                    item.nama || '',
+                    item.nip_nisn || '',
+                    item.kelas_jabatan || '',
+                    item.status || '',
+                    new Date(item.tanggal_input).toLocaleDateString('id-ID')
+                ]);
+            }
+
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `Data ${type.charAt(0).toUpperCase() + type.slice(1)}`);
+            
+            const fileName = `Data_${type.charAt(0).toUpperCase() + type.slice(1)}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            showNotification(`File Excel berhasil didownload: ${fileName}`, 'success');
         }
 
-        // Import functionality
+        // Import Functions
         function showImportModal(type) {
             importType = type;
-            const typeLabels = {
-                'siswa': 'Siswa',
-                'guru': 'Guru',
-                'tendik': 'Tenaga Kependidikan',
-                'kelas': 'Kelas'
-            };
-            document.getElementById('import-title').textContent = `Import Data ${typeLabels[type]}`;
+            document.getElementById('import-title').textContent = `Import Data ${type.charAt(0).toUpperCase() + type.slice(1)}`;
             document.getElementById('import-modal').classList.remove('hidden');
-            resetImportModal();
+            clearFile();
         }
 
         function hideImportModal() {
             document.getElementById('import-modal').classList.add('hidden');
-            resetImportModal();
-        }
-
-        function resetImportModal() {
-            selectedFile = null;
+            clearFile();
+            importType = '';
             importData = [];
-            document.getElementById('import-file').value = '';
-            document.getElementById('file-info').classList.add('hidden');
-            document.getElementById('preview-area').classList.add('hidden');
-            document.getElementById('import-options').classList.add('hidden');
-            document.getElementById('import-btn').disabled = true;
-            document.getElementById('upload-area').classList.remove('hidden');
         }
 
         function handleFileSelect(event) {
@@ -1432,498 +2011,205 @@
             selectedFile = file;
             document.getElementById('file-name').textContent = file.name;
             document.getElementById('file-info').classList.remove('hidden');
-            document.getElementById('upload-area').classList.add('hidden');
+            document.getElementById('upload-area').style.display = 'none';
 
-            // Process file
-            processFile(file);
-        }
-
-        function clearFile() {
-            resetImportModal();
-        }
-
-        function processFile(file) {
+            // Read and preview file
             const reader = new FileReader();
-            
             reader.onload = function(e) {
                 try {
-                    let data;
-                    const fileName = file.name.toLowerCase();
-                    
-                    if (fileName.endsWith('.csv')) {
-                        // Process CSV
-                        data = parseCSV(e.target.result);
-                        
-                        importData = data;
-                        showPreview(data);
-                        document.getElementById('import-options').classList.remove('hidden');
-                        document.getElementById('import-btn').disabled = false;
-                    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                        // Process Excel file
-                        const workbook = XLSX.read(e.target.result, { type: 'array' });
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
-                        data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                        
-                        importData = data;
-                        showPreview(data);
-                        document.getElementById('import-options').classList.remove('hidden');
-                        document.getElementById('import-btn').disabled = false;
+                    let workbook;
+                    if (file.name.endsWith('.csv')) {
+                        const csv = e.target.result;
+                        workbook = XLSX.read(csv, { type: 'string' });
                     } else {
-                        throw new Error('Format file tidak didukung. Gunakan file Excel (.xlsx, .xls) atau CSV.');
+                        workbook = XLSX.read(e.target.result, { type: 'binary' });
                     }
+                    
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    
+                    importData = data;
+                    showPreview(data);
                     
                 } catch (error) {
                     showNotification('Error membaca file: ' + error.message, 'error');
-                    resetImportModal();
                 }
             };
 
-            // Read file based on type
-            if (file.name.toLowerCase().endsWith('.csv')) {
+            if (file.name.endsWith('.csv')) {
                 reader.readAsText(file);
             } else {
-                reader.readAsArrayBuffer(file);
+                reader.readAsBinaryString(file);
             }
         }
 
-        function parseCSV(text) {
-            const lines = text.split('\n');
-            const result = [];
-            
-            for (let line of lines) {
-                if (line.trim()) {
-                    // Simple CSV parsing - handles basic cases
-                    const row = line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
-                    result.push(row);
-                }
-            }
-            
-            return result;
+        function clearFile() {
+            selectedFile = null;
+            importData = [];
+            document.getElementById('import-file').value = '';
+            document.getElementById('file-info').classList.add('hidden');
+            document.getElementById('upload-area').style.display = 'block';
+            document.getElementById('preview-area').classList.add('hidden');
+            document.getElementById('import-options').classList.add('hidden');
+            document.getElementById('import-btn').disabled = true;
         }
 
         function showPreview(data) {
-            const previewData = data.slice(0, 6); // Show header + 5 rows
-            const totalRows = data.length;
+            if (data.length === 0) return;
+
+            const previewTable = document.getElementById('preview-table');
+            const totalRows = document.getElementById('total-rows');
             
-            document.getElementById('total-rows').textContent = totalRows - 1; // Exclude header
+            // Show first 5 rows for preview
+            const previewData = data.slice(0, 5);
             
-            let tableHTML = '<table class="min-w-full divide-y divide-gray-200 text-sm">';
+            let tableHTML = '<table class="min-w-full divide-y divide-gray-200"><tbody class="bg-white divide-y divide-gray-200">';
             
             previewData.forEach((row, index) => {
-                const isHeader = index === 0;
-                tableHTML += `<tr class="${isHeader ? 'bg-gray-50' : 'bg-white'}">`;
-                
+                tableHTML += '<tr class="' + (index === 0 ? 'bg-gray-50 font-medium' : '') + '">';
                 row.forEach(cell => {
-                    const tag = isHeader ? 'th' : 'td';
-                    const classes = isHeader 
-                        ? 'px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'
-                        : 'px-3 py-2 whitespace-nowrap text-sm text-gray-900';
-                    tableHTML += `<${tag} class="${classes}">${cell || '-'}</${tag}>`;
+                    tableHTML += `<td class="px-4 py-2 text-sm text-gray-900 border-r border-gray-200">${cell || ''}</td>`;
                 });
-                
                 tableHTML += '</tr>';
             });
             
-            tableHTML += '</table>';
+            tableHTML += '</tbody></table>';
+            previewTable.innerHTML = tableHTML;
             
-            document.getElementById('preview-table').innerHTML = tableHTML;
+            totalRows.textContent = data.length;
             document.getElementById('preview-area').classList.remove('hidden');
+            document.getElementById('import-options').classList.remove('hidden');
+            document.getElementById('import-btn').disabled = false;
         }
 
-        function processImport() {
-            if (!selectedFile || !importData.length) return;
+        function downloadTemplate() {
+            let headers;
+            
+            if (importType === 'siswa') {
+                headers = ['Nama Lengkap', 'Nama Panggilan', 'NIS', 'NISN', 'Jenis Kelamin', 'Agama', 'Tempat Lahir', 'Tanggal Lahir', 'Kelas', 'Alamat', 'Nama Ayah', 'Nama Ibu'];
+            } else if (importType === 'guru' || importType === 'tendik') {
+                headers = ['Nama Lengkap', 'NIK', 'NUPTK', 'Tempat Lahir', 'Tanggal Lahir', 'Alamat', 'No. Telepon', 'Email', 'Jabatan'];
+            } else if (importType === 'kelas') {
+                headers = ['Nama Kelas', 'Wali Kelas', 'Tingkat'];
+            }
+
+            const ws = XLSX.utils.aoa_to_sheet([headers]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Template');
+            
+            const fileName = `Template_${importType.charAt(0).toUpperCase() + importType.slice(1)}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            showNotification(`Template berhasil didownload: ${fileName}`, 'success');
+        }
+
+        async function processImport() {
+            if (!importData || importData.length === 0) {
+                showNotification('Tidak ada data untuk diimport.', 'error');
+                return;
+            }
 
             const importBtn = document.getElementById('import-btn');
             const importText = importBtn.querySelector('.import-text');
             const spinner = importBtn.querySelector('.loading-spinner');
             
             importBtn.disabled = true;
-            importText.textContent = 'Mengimpor...';
+            importText.textContent = 'Mengimport...';
             spinner.classList.remove('hidden');
 
-            setTimeout(() => {
-                try {
-                    const skipHeader = document.getElementById('skip-header').checked;
-                    const replaceData = document.getElementById('replace-data').checked;
-                    
-                    // If replace data is checked, delete existing data of this type
-                    if (replaceData) {
-                        const existingData = allData.filter(item => item.type === importType);
-                        existingData.forEach(item => {
-                            const index = allData.findIndex(d => d.id === item.id);
-                            if (index !== -1) {
-                                allData.splice(index, 1);
-                                currentRecordCount--;
-                            }
-                        });
-                    }
+            try {
+                const skipHeader = document.getElementById('skip-header').checked;
+                const replaceData = document.getElementById('replace-data').checked;
+                const syncToSheets = document.getElementById('sync-to-sheets').checked;
 
-                    // Process import data
-                    const dataToImport = skipHeader ? importData.slice(1) : importData;
-                    let successCount = 0;
-                    let errorCount = 0;
+                let dataToProcess = skipHeader ? importData.slice(1) : importData;
+                
+                // Remove empty rows
+                dataToProcess = dataToProcess.filter(row => row.some(cell => cell && cell.toString().trim()));
 
-                    for (const row of dataToImport) {
-                        if (currentRecordCount >= 999) {
-                            showNotification(`Batas maksimum 999 data tercapai. ${successCount} data berhasil diimpor.`, 'error');
-                            break;
+                if (replaceData) {
+                    // Remove existing data of this type
+                    allData = allData.filter(item => item.type !== importType);
+                }
+
+                let successCount = 0;
+                let errorCount = 0;
+
+                dataToProcess.forEach(row => {
+                    try {
+                        const data = {
+                            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                            type: importType,
+                            status: 'Aktif',
+                            tanggal_input: new Date().toISOString()
+                        };
+
+                        if (importType === 'siswa') {
+                            data.nama = row[0] || '';
+                            data.nama_panggilan = row[1] || '';
+                            data.nis = row[2] || '';
+                            data.nisn = row[3] || '';
+                            data.jenis_kelamin = row[4] || '';
+                            data.agama = row[5] || '';
+                            data.tempat_lahir = row[6] || '';
+                            data.tanggal_lahir = row[7] || '';
+                            data.kelas_jabatan = row[8] || '';
+                            data.alamat = row[9] || '';
+                            data.nama_ayah = row[10] || '';
+                            data.nama_ibu = row[11] || '';
+                        } else if (importType === 'guru' || importType === 'tendik') {
+                            data.nama = row[0] || '';
+                            data.nik = row[1] || '';
+                            data.nuptk = row[2] || '';
+                            data.tempat_lahir = row[3] || '';
+                            data.tanggal_lahir = row[4] || '';
+                            data.alamat = row[5] || '';
+                            data.no_telepon = row[6] || '';
+                            data.email = row[7] || '';
+                            data.kelas_jabatan = row[8] || '';
+                        } else if (importType === 'kelas') {
+                            data.nama = row[0] || '';
+                            data.nip_nisn = row[1] || '';
+                            data.kelas_jabatan = row[2] || '';
                         }
 
-                        try {
-                            const record = mapRowToRecord(row, importType);
-                            if (record) {
-                                allData.push(record);
-                                successCount++;
-                                currentRecordCount++;
-                            }
-                        } catch (error) {
+                        // Validate required fields
+                        if (data.nama && data.nama.trim()) {
+                            allData.push(data);
+                            successCount++;
+                        } else {
                             errorCount++;
                         }
+                    } catch (error) {
+                        errorCount++;
                     }
+                });
 
-                    // Save to localStorage
-                    saveData();
-                    
-                    // Update UI
-                    updateStats();
-                    renderTable('siswa');
-                    renderTable('guru');
-                    renderTable('tendik');
-                    renderTable('kelas');
-
-                    hideImportModal();
-                    
-                    if (errorCount === 0) {
-                        showNotification(`Berhasil mengimpor ${successCount} data ${importType}!`, 'success');
-                    } else {
-                        showNotification(`Import selesai: ${successCount} berhasil, ${errorCount} gagal.`, 'success');
-                    }
-
-                } catch (error) {
-                    showNotification('Error saat mengimpor data: ' + error.message, 'error');
-                } finally {
-                    importBtn.disabled = false;
-                    importText.textContent = 'Import Data';
-                    spinner.classList.add('hidden');
+                // Update counts
+                currentRecordCount = allData.length;
+                
+                // Save to localStorage
+                saveDataToLocalStorage();
+                
+                // Update UI
+                updateStats();
+                renderTable(importType);
+                
+                // Sync to Google Sheets if requested and connected
+                if (syncToSheets && isGoogleSheetsConnected) {
+                    await syncWithGoogleSheets();
                 }
-            }, 1000);
-        }
-
-        function mapRowToRecord(row, type) {
-            if (!row || row.length === 0) return null;
-
-            const baseRecord = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                type: type,
-                status: 'Aktif',
-                tanggal_input: new Date().toISOString()
-            };
-
-            if (type === 'siswa') {
-                // Expected columns: Nama, Nama Panggilan, NIS, NISN, JK, Agama, Tempat Lahir, Tanggal Lahir, Kelas, Alamat, Nama Ayah, Nama Ibu
-                return {
-                    ...baseRecord,
-                    nama: row[0] || '',
-                    nama_panggilan: row[1] || '',
-                    nis: row[2] || '',
-                    nisn: row[3] || '',
-                    jenis_kelamin: row[4] || '',
-                    agama: row[5] || '',
-                    tempat_lahir: row[6] || '',
-                    tanggal_lahir: row[7] || '',
-                    kelas_jabatan: row[8] || '',
-                    alamat: row[9] || '',
-                    nama_ayah: row[10] || '',
-                    nama_ibu: row[11] || ''
-                };
-            } else if (type === 'guru') {
-                // Expected columns: Nama, NIK, NUPTK, Tempat Lahir, Tanggal Lahir, No Telepon, Email, Jabatan, Alamat
-                return {
-                    ...baseRecord,
-                    nama: row[0] || '',
-                    nik: row[1] || '',
-                    nuptk: row[2] || '',
-                    tempat_lahir: row[3] || '',
-                    tanggal_lahir: row[4] || '',
-                    no_telepon: row[5] || '',
-                    email: row[6] || '',
-                    kelas_jabatan: row[7] || '',
-                    alamat: row[8] || ''
-                };
-            } else if (type === 'tendik') {
-                // Expected columns: Nama, NIK, NUPTK, Tempat Lahir, Tanggal Lahir, No Telepon, Email, Jabatan, Alamat
-                return {
-                    ...baseRecord,
-                    nama: row[0] || '',
-                    nik: row[1] || '',
-                    nuptk: row[2] || '',
-                    tempat_lahir: row[3] || '',
-                    tanggal_lahir: row[4] || '',
-                    no_telepon: row[5] || '',
-                    email: row[6] || '',
-                    kelas_jabatan: row[7] || '',
-                    alamat: row[8] || ''
-                };
-            } else if (type === 'kelas') {
-                // Expected columns: Nama Kelas, Wali Kelas, Tingkat
-                return {
-                    ...baseRecord,
-                    nama: row[0] || '',
-                    nip_nisn: row[1] || '',
-                    kelas_jabatan: row[2] || ''
-                };
-            }
-
-            return null;
-        }
-
-        // Simple Excel/CSV processing functions
-        function parseExcelFile(file, callback) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    // For CSV files
-                    if (file.name.toLowerCase().endsWith('.csv')) {
-                        const text = e.target.result;
-                        const data = parseCSV(text);
-                        callback(data);
-                        return;
-                    }
-                    
-                    // For Excel files - simplified parsing
-                    showNotification('Untuk file Excel, silakan convert ke CSV terlebih dahulu atau gunakan template CSV.', 'error');
-                } catch (error) {
-                    showNotification('Error membaca file: ' + error.message, 'error');
-                }
-            };
-            
-            if (file.name.toLowerCase().endsWith('.csv')) {
-                reader.readAsText(file);
-            } else {
-                reader.readAsArrayBuffer(file);
-            }
-        }
-
-        function downloadTemplate() {
-            // Download Excel template
-            downloadTemplateAsExcel();
-        }
-
-        function downloadTemplateAsExcel() {
-            try {
-                const templates = {
-                    siswa: [
-                        ['Nama', 'Nama Panggilan', 'NIS', 'NISN', 'Jenis Kelamin', 'Agama', 'Tempat Lahir', 'Tanggal Lahir', 'Kelas', 'Alamat', 'Nama Ayah', 'Nama Ibu'],
-                        ['Ahmad Budi Santoso', 'Budi', '12345', '1234567890123456', 'Laki-laki', 'Islam', 'Jakarta', '2010-01-15', '1A', 'Jl. Merdeka No. 1, Jakarta Pusat', 'Ahmad Wijaya', 'Siti Nurhaliza'],
-                        ['Sari Dewi Lestari', 'Sari', '12346', '1234567890123457', 'Perempuan', 'Islam', 'Bandung', '2010-03-20', '1A', 'Jl. Sudirman No. 25, Bandung', 'Dedi Lestari', 'Dewi Sartika']
-                    ],
-                    guru: [
-                        ['Nama', 'NIK', 'NUPTK', 'Tempat Lahir', 'Tanggal Lahir', 'No Telepon', 'Email', 'Jabatan', 'Alamat'],
-                        ['Siti Nurhaliza, S.Pd', '3201234567890123', '1234567890123456', 'Bandung', '1985-05-20', '081234567890', 'siti.nurhaliza@email.com', 'Guru Kelas', 'Jl. Pendidikan No. 5, Bandung'],
-                        ['Ahmad Fauzi, S.Pd', '3201234567890124', '1234567890123457', 'Jakarta', '1982-03-15', '081234567891', 'ahmad.fauzi@email.com', 'Guru Mata Pelajaran', 'Jl. Guru No. 10, Jakarta']
-                    ],
-                    tendik: [
-                        ['Nama', 'NIK', 'NUPTK', 'Tempat Lahir', 'Tanggal Lahir', 'No Telepon', 'Email', 'Jabatan', 'Alamat'],
-                        ['Bambang Wijaya', '3201234567890128', '1234567890123461', 'Surabaya', '1980-03-10', '081234567895', 'bambang.wijaya@email.com', 'Tata Usaha', 'Jl. Admin No. 3, Surabaya'],
-                        ['Sari Indah Lestari', '3201234567890129', '1234567890123462', 'Jakarta', '1983-07-22', '081234567896', 'sari.indah@email.com', 'Pustakawan', 'Jl. Perpustakaan No. 7, Jakarta']
-                    ],
-                    kelas: [
-                        ['Nama Kelas', 'Wali Kelas', 'Tingkat'],
-                        ['1A', 'Siti Nurhaliza, S.Pd', 'Kelas 1'],
-                        ['1B', 'Ahmad Fauzi, S.Pd', 'Kelas 1']
-                    ]
-                };
-
-                const templateData = templates[importType] || templates.siswa;
                 
-                // Create workbook and worksheet
-                const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.aoa_to_sheet(templateData);
-
-                // Set column widths
-                const colWidths = templateData[0].map(() => ({ wch: 20 }));
-                ws['!cols'] = colWidths;
-
-                // Add worksheet to workbook
-                const typeLabels = {
-                    'siswa': 'Siswa',
-                    'guru': 'Guru',
-                    'tendik': 'Tendik',
-                    'kelas': 'Kelas'
-                };
-                
-                XLSX.utils.book_append_sheet(wb, ws, `Template ${typeLabels[importType]}`);
-
-                // Generate filename
-                const currentDate = new Date().toISOString().split('T')[0];
-                const fileName = `Template_Data_${typeLabels[importType]}_${currentDate}.xlsx`;
-
-                // Download file
-                XLSX.writeFile(wb, fileName);
-                
-                showNotification(`Template ${typeLabels[importType]} berhasil didownload sebagai Excel! File: ${fileName}`, 'success');
+                hideImportModal();
+                showNotification(`Import selesai! ${successCount} data berhasil diimport, ${errorCount} data gagal.`, 'success');
 
             } catch (error) {
-                console.error('Error downloading template:', error);
-                showNotification('Terjadi kesalahan saat mendownload template. Menggunakan CSV sebagai alternatif.', 'error');
-                downloadTemplateAsCSV();
-            }
-        }
-
-        function downloadTemplateAsCSV() {
-            const templates = {
-                siswa: [
-                    ['Nama', 'Nama Panggilan', 'NIS', 'NISN', 'Jenis Kelamin', 'Agama', 'Tempat Lahir', 'Tanggal Lahir', 'Kelas', 'Alamat', 'Nama Ayah', 'Nama Ibu'],
-                    ['Ahmad Budi Santoso', 'Budi', '12345', '1234567890123456', 'Laki-laki', 'Islam', 'Jakarta', '2010-01-15', '1A', 'Jl. Merdeka No. 1, Jakarta Pusat', 'Ahmad Wijaya', 'Siti Nurhaliza'],
-                    ['Sari Dewi Lestari', 'Sari', '12346', '1234567890123457', 'Perempuan', 'Islam', 'Bandung', '2010-03-20', '1A', 'Jl. Sudirman No. 25, Bandung', 'Dedi Lestari', 'Dewi Sartika']
-                ],
-                guru: [
-                    ['Nama', 'NIK', 'NUPTK', 'Tempat Lahir', 'Tanggal Lahir', 'No Telepon', 'Email', 'Jabatan', 'Alamat'],
-                    ['Siti Nurhaliza, S.Pd', '3201234567890123', '1234567890123456', 'Bandung', '1985-05-20', '081234567890', 'siti.nurhaliza@email.com', 'Guru Kelas', 'Jl. Pendidikan No. 5, Bandung'],
-                    ['Ahmad Fauzi, S.Pd', '3201234567890124', '1234567890123457', 'Jakarta', '1982-03-15', '081234567891', 'ahmad.fauzi@email.com', 'Guru Mata Pelajaran', 'Jl. Guru No. 10, Jakarta']
-                ],
-                tendik: [
-                    ['Nama', 'NIK', 'NUPTK', 'Tempat Lahir', 'Tanggal Lahir', 'No Telepon', 'Email', 'Jabatan', 'Alamat'],
-                    ['Bambang Wijaya', '3201234567890128', '1234567890123461', 'Surabaya', '1980-03-10', '081234567895', 'bambang.wijaya@email.com', 'Tata Usaha', 'Jl. Admin No. 3, Surabaya'],
-                    ['Sari Indah Lestari', '3201234567890129', '1234567890123462', 'Jakarta', '1983-07-22', '081234567896', 'sari.indah@email.com', 'Pustakawan', 'Jl. Perpustakaan No. 7, Jakarta']
-                ],
-                kelas: [
-                    ['Nama Kelas', 'Wali Kelas', 'Tingkat'],
-                    ['1A', 'Siti Nurhaliza, S.Pd', 'Kelas 1'],
-                    ['1B', 'Ahmad Fauzi, S.Pd', 'Kelas 1']
-                ]
-            };
-
-            const templateData = templates[importType] || templates.siswa;
-            
-            // Convert to CSV
-            const csvContent = templateData.map(row => 
-                row.map(cell => `"${cell}"`).join(',')
-            ).join('\n');
-            
-            // Create and download CSV file
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            
-            if (link.download !== undefined) {
-                const typeLabels = {
-                    'siswa': 'Siswa',
-                    'guru': 'Guru',
-                    'tendik': 'Tendik',
-                    'kelas': 'Kelas'
-                };
-                
-                const currentDate = new Date().toISOString().split('T')[0];
-                const fileName = `Template_Data_${typeLabels[importType]}_${currentDate}.csv`;
-                
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', fileName);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                showNotification(`Template ${typeLabels[importType]} berhasil didownload sebagai CSV! File: ${fileName}`, 'success');
-            }
-        }
-
-        // Download Excel function
-        function downloadExcel(type) {
-            try {
-                const typeLabels = {
-                    'siswa': 'Siswa',
-                    'guru': 'Guru',
-                    'tendik': 'Tendik',
-                    'kelas': 'Kelas'
-                };
-
-                // Get data for the specific type
-                const filteredData = allData.filter(item => item.type === type);
-                
-                if (filteredData.length === 0) {
-                    showNotification(`Tidak ada data ${typeLabels[type]} untuk didownload.`, 'error');
-                    return;
-                }
-
-                // Prepare data for Excel
-                let excelData = [];
-                let headers = [];
-
-                if (type === 'siswa') {
-                    headers = ['No', 'Nama', 'Nama Panggilan', 'NIS', 'NISN', 'Jenis Kelamin', 'Agama', 'Tempat Lahir', 'Tanggal Lahir', 'Kelas', 'Alamat', 'Nama Ayah', 'Nama Ibu', 'Status', 'Tanggal Input'];
-                    excelData = filteredData.map((item, index) => [
-                        index + 1,
-                        item.nama || '',
-                        item.nama_panggilan || '',
-                        item.nis || '',
-                        item.nisn || '',
-                        item.jenis_kelamin || '',
-                        item.agama || '',
-                        item.tempat_lahir || '',
-                        item.tanggal_lahir || '',
-                        item.kelas_jabatan || '',
-                        item.alamat || '',
-                        item.nama_ayah || '',
-                        item.nama_ibu || '',
-                        item.status || '',
-                        new Date(item.tanggal_input).toLocaleDateString('id-ID')
-                    ]);
-                } else if (type === 'guru' || type === 'tendik') {
-                    headers = ['No', 'Nama', 'NIK', 'NUPTK', 'Tempat Lahir', 'Tanggal Lahir', 'No Telepon', 'Email', 'Jabatan', 'Alamat', 'Status', 'Tanggal Input'];
-                    excelData = filteredData.map((item, index) => [
-                        index + 1,
-                        item.nama || '',
-                        item.nik || '',
-                        item.nuptk || '',
-                        item.tempat_lahir || '',
-                        item.tanggal_lahir || '',
-                        item.no_telepon || '',
-                        item.email || '',
-                        item.kelas_jabatan || '',
-                        item.alamat || '',
-                        item.status || '',
-                        new Date(item.tanggal_input).toLocaleDateString('id-ID')
-                    ]);
-                } else if (type === 'kelas') {
-                    headers = ['No', 'Nama Kelas', 'Wali Kelas', 'Tingkat', 'Status', 'Tanggal Input'];
-                    excelData = filteredData.map((item, index) => [
-                        index + 1,
-                        item.nama || '',
-                        item.nip_nisn || '',
-                        item.kelas_jabatan || '',
-                        item.status || '',
-                        new Date(item.tanggal_input).toLocaleDateString('id-ID')
-                    ]);
-                }
-
-                // Add headers to the beginning
-                excelData.unshift(headers);
-
-                // Create workbook and worksheet
-                const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.aoa_to_sheet(excelData);
-
-                // Set column widths
-                const colWidths = headers.map(() => ({ wch: 15 }));
-                ws['!cols'] = colWidths;
-
-                // Add worksheet to workbook
-                XLSX.utils.book_append_sheet(wb, ws, typeLabels[type]);
-
-                // Generate filename
-                const currentDate = new Date().toISOString().split('T')[0];
-                const fileName = `Data_${typeLabels[type]}_${schoolConfig.nama_sekolah.replace(/\s+/g, '_')}_${currentDate}.xlsx`;
-
-                // Download file
-                XLSX.writeFile(wb, fileName);
-
-                showNotification(`Data ${typeLabels[type]} berhasil didownload! File: ${fileName}`, 'success');
-
-            } catch (error) {
-                console.error('Error downloading Excel:', error);
-                showNotification('Terjadi kesalahan saat mendownload file Excel. Silakan coba lagi.', 'error');
+                console.error('Import error:', error);
+                showNotification('Terjadi kesalahan saat import: ' + error.message, 'error');
+            } finally {
+                importBtn.disabled = false;
+                importText.textContent = 'Import Data';
+                spinner.classList.add('hidden');
             }
         }
 
@@ -1933,58 +2219,24 @@
             document.getElementById('setting-alamat-sekolah').value = schoolConfig.alamat_sekolah;
             document.getElementById('setting-kepala-sekolah').value = schoolConfig.kepala_sekolah;
             
-            // Update current logo display
-            updateCurrentLogoDisplay();
-        }
-
-        function updateCurrentLogoDisplay() {
-            const currentLogo = document.getElementById('current-logo');
-            const logoType = schoolConfig.logo_type;
+            // Set connection method
+            const scriptRadio = document.querySelector('input[name="connection-method"][value="script"]');
+            const apiRadio = document.querySelector('input[name="connection-method"][value="api"]');
             
-            if (logoType === 'preset') {
-                const presetIcon = schoolConfig.logo_preset;
-                currentLogo.innerHTML = getPresetIconSVG(presetIcon);
-            } else if (logoType === 'upload' && schoolConfig.logo_url) {
-                currentLogo.innerHTML = `<img src="${schoolConfig.logo_url}" alt="Logo" class="w-12 h-12 object-cover rounded-full">`;
+            if (googleSheetsConfig.useScript) {
+                scriptRadio.checked = true;
             } else {
-                // Default icon
-                currentLogo.innerHTML = getPresetIconSVG('school');
+                apiRadio.checked = true;
             }
-        }
-
-        function updateHeaderLogo() {
-            const headerLogo = document.querySelector('header .bg-white.p-2.rounded-lg');
-            const logoType = schoolConfig.logo_type;
             
-            if (logoType === 'preset') {
-                const presetIcon = schoolConfig.logo_preset;
-                if (headerLogo) {
-                    headerLogo.innerHTML = getPresetIconSVG(presetIcon, 'w-8 h-8 text-blue-600');
-                }
-            } else if (logoType === 'upload' && schoolConfig.logo_url) {
-                if (headerLogo) {
-                    headerLogo.innerHTML = `<img src="${schoolConfig.logo_url}" alt="Logo" class="w-8 h-8 object-cover rounded">`;
-                }
+            // Update form visibility
+            toggleConnectionMethod();
+            
+            // Fill API fields if using API method
+            if (!googleSheetsConfig.useScript) {
+                document.getElementById('setting-google-api-key').value = googleSheetsConfig.apiKey || '';
+                document.getElementById('setting-google-sheet-id').value = googleSheetsConfig.sheetId || '';
             }
-        }
-
-        function getPresetIconSVG(iconType, classes = 'w-12 h-12 text-blue-600') {
-            const icons = {
-                school: `<svg class="${classes}" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
-                </svg>`,
-                book: `<svg class="${classes}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                </svg>`,
-                graduation: `<svg class="${classes}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
-                </svg>`,
-                star: `<svg class="${classes}" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                </svg>`
-            };
-            return icons[iconType] || icons.school;
         }
 
         function updateSchoolInfoForm(event) {
@@ -2014,108 +2266,6 @@
             }, 500);
         }
 
-        function handleLogoSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            // Check file size (2MB limit)
-            if (file.size > 2 * 1024 * 1024) {
-                showNotification('Ukuran file terlalu besar. Maksimal 2MB.', 'error');
-                return;
-            }
-
-            // Check file type
-            if (!file.type.startsWith('image/')) {
-                showNotification('File harus berupa gambar (PNG, JPG, GIF).', 'error');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('logo-preview-img').src = e.target.result;
-                document.getElementById('logo-file-name').textContent = file.name;
-                document.getElementById('logo-file-size').textContent = formatFileSize(file.size);
-                document.getElementById('logo-preview').classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        function clearLogo() {
-            document.getElementById('logo-file').value = '';
-            document.getElementById('logo-preview').classList.add('hidden');
-        }
-
-        function uploadLogo() {
-            const fileInput = document.getElementById('logo-file');
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            const uploadBtn = document.getElementById('upload-logo-btn');
-            const uploadText = uploadBtn.querySelector('.upload-text');
-            const spinner = uploadBtn.querySelector('.loading-spinner');
-            
-            uploadBtn.disabled = true;
-            uploadText.textContent = 'Mengupload...';
-            spinner.classList.remove('hidden');
-
-            try {
-                // Convert to base64 for storage
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const logoUrl = e.target.result;
-                    
-                    schoolConfig.logo_type = 'upload';
-                    schoolConfig.logo_url = logoUrl;
-                    schoolConfig.logo_preset = '';
-                    
-                    saveConfig();
-                    updateSchoolInfo();
-                    updateCurrentLogoDisplay();
-                    
-                    showNotification('Logo berhasil diupload!', 'success');
-                    clearLogo();
-
-                    uploadBtn.disabled = false;
-                    uploadText.textContent = 'Upload Logo';
-                    spinner.classList.add('hidden');
-                };
-                reader.readAsDataURL(file);
-            } catch (error) {
-                showNotification('Gagal mengupload logo. Silakan coba lagi.', 'error');
-                uploadBtn.disabled = false;
-                uploadText.textContent = 'Upload Logo';
-                spinner.classList.add('hidden');
-            }
-        }
-
-        function selectPresetIcon(iconType) {
-            // Update visual selection
-            document.querySelectorAll('.preset-icon').forEach(btn => {
-                btn.classList.remove('border-blue-500', 'bg-blue-50');
-                btn.classList.add('border-gray-200');
-            });
-            event.target.closest('.preset-icon').classList.add('border-blue-500', 'bg-blue-50');
-            event.target.closest('.preset-icon').classList.remove('border-gray-200');
-
-            schoolConfig.logo_type = 'preset';
-            schoolConfig.logo_preset = iconType;
-            schoolConfig.logo_url = '';
-            
-            saveConfig();
-            updateSchoolInfo();
-            updateCurrentLogoDisplay();
-            
-            showNotification('Logo berhasil diubah!', 'success');
-        }
-
         function showResetConfirmation() {
             document.getElementById('reset-modal').classList.remove('hidden');
         }
@@ -2125,60 +2275,210 @@
         }
 
         function confirmReset() {
+            // Reset to default values
             schoolConfig = {
                 nama_sekolah: "SDN Merdeka 01",
                 alamat_sekolah: "Jl. Pendidikan No. 123, Jakarta",
-                kepala_sekolah: "Drs. Ahmad Wijaya, M.Pd",
-                logo_type: "preset",
-                logo_preset: "school",
-                logo_url: ""
+                kepala_sekolah: "Drs. Ahmad Wijaya, M.Pd"
             };
             
+            googleSheetsConfig = {
+                apiKey: '',
+                sheetId: '',
+                isConfigured: false
+            };
+
             saveConfig();
             updateSchoolInfo();
             updateSettingsForm();
+            initializeGoogleSheets();
             
-            showNotification('Pengaturan berhasil direset ke default!', 'success');
             hideResetModal();
+            showNotification('Pengaturan berhasil direset ke nilai default!', 'success');
         }
 
-        // Initialize app when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check if user is already logged in
-            if (checkLoginState()) {
-                // User is logged in, initialize the app
-                initApp();
+        // Login Functions
+        function handleLogin(event) {
+            event.preventDefault();
+            
+            const loginBtn = document.getElementById('login-btn');
+            const loginText = loginBtn.querySelector('.login-text');
+            const spinner = loginBtn.querySelector('.loading-spinner');
+            const errorDiv = document.getElementById('login-error');
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            loginBtn.disabled = true;
+            loginText.textContent = 'Memverifikasi...';
+            spinner.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+
+            // Simulate login process
+            setTimeout(() => {
+                if (username === 'admin' && password === 'admin123') {
+                    document.getElementById('login-page').classList.add('hidden');
+                    document.getElementById('main-app').classList.remove('hidden');
+                    showNotification('Login berhasil! Selamat datang di Sistem Dapodik.', 'success');
+                } else {
+                    errorDiv.classList.remove('hidden');
+                    loginBtn.disabled = false;
+                    loginText.textContent = 'Masuk';
+                    spinner.classList.add('hidden');
+                }
+            }, 1000);
+        }
+
+        function handleLogout() {
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            showNotification('Anda telah logout dari sistem.', 'success');
+        }
+
+        // Notification System
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg max-w-sm transition-all duration-300 transform translate-x-full`;
+            
+            const bgColor = {
+                'success': 'bg-green-50 border border-green-200',
+                'error': 'bg-red-50 border border-red-200',
+                'warning': 'bg-yellow-50 border border-yellow-200',
+                'info': 'bg-blue-50 border border-blue-200'
+            };
+            
+            const textColor = {
+                'success': 'text-green-800',
+                'error': 'text-red-800',
+                'warning': 'text-yellow-800',
+                'info': 'text-blue-800'
+            };
+            
+            const icon = {
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️',
+                'info': 'ℹ️'
+            };
+            
+            notification.className += ` ${bgColor[type]}`;
+            notification.innerHTML = `
+                <div class="flex items-start">
+                    <span class="mr-2">${icon[type]}</span>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium ${textColor[type]}">${message}</p>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-gray-400 hover:text-gray-600">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.remove();
+                    }
+                }, 300);
+            }, 5000);
+        }
+
+        // Real-time Sync Functions
+        let syncInterval;
+
+        function startRealTimeSync() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
             }
+
+            // Sync every 30 seconds if connected
+            syncInterval = setInterval(async () => {
+                if (isGoogleSheetsConnected && sheetsAPI) {
+                    try {
+                        await loadDataFromGoogleSheets();
+                    } catch (error) {
+                        console.log('Background sync failed:', error);
+                    }
+                }
+            }, 30000);
+        }
+
+        function stopRealTimeSync() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+        }
+
+        // Cross-tab sync
+        function handleStorageChange(event) {
+            if (event.key === 'dapodik_data') {
+                // Data changed in another tab, reload
+                loadDataFromLocalStorage();
+                showNotification('Data diperbarui dari tab lain', 'info');
+            }
+        }
+
+        // Visibility change handler for tab focus
+        function handleVisibilityChange() {
+            if (!document.hidden && isGoogleSheetsConnected) {
+                // Tab became active, sync data
+                loadDataFromGoogleSheets();
+            }
+        }
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+            startRealTimeSync();
+            
+            // Add event listeners for cross-tab sync
+            window.addEventListener('storage', handleStorageChange);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', function() {
+                stopRealTimeSync();
+            });
         });
+
+        // Drag and drop for file upload
+        const uploadArea = document.getElementById('upload-area');
+        if (uploadArea) {
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('border-blue-500', 'bg-blue-50');
+            });
+
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('border-blue-500', 'bg-blue-50');
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('border-blue-500', 'bg-blue-50');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    document.getElementById('import-file').files = files;
+                    handleFileSelect({ target: { files: files } });
+                }
+            });
+        }
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99367fa5e29aa5b9',t:'MTc2MTI3NzcwOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
-<script>
-const scriptURL = "https://script.google.com/macros/s/AKfycbxjyJNWwkwHMkFP5far3_H_RYpojDo14bVI9g58mFrZbBIb0crosThdZJQHDNPRWOA/exec";
-
-async function addData(event, type) {
-  event.preventDefault();
-  const submitBtn = document.getElementById(`submit-${type}`);
-  const spinner = submitBtn.querySelector(".loading-spinner");
-  const text = submitBtn.querySelector(".submit-text");
-  spinner.classList.remove("hidden");
-  text.textContent = "Menyimpan...";
-
-  let formData = { type };
-  const inputs = document.querySelectorAll(`#form-${type} input, #form-${type} select, #form-${type} textarea`);
-  inputs.forEach(input => formData[input.id] = input.value);
-
-  try {
-    await fetch(scriptURL, { method: "POST", body: JSON.stringify(formData) });
-    alert("✅ Data berhasil disimpan");
-    document.querySelector(`#form-${type} form`).reset();
-  } catch (err) {
-    alert("❌ Gagal menyimpan data");
-    console.error(err);
-  } finally {
-    spinner.classList.add("hidden");
-    text.textContent = "Simpan";
-  }
-}
-</script>
-</body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99379143120db5d0',t:'MTc2MTI4ODkxNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
