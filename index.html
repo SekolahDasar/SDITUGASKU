@@ -2152,4 +2152,33 @@
         });
     </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99367fa5e29aa5b9',t:'MTc2MTI3NzcwOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>
+const scriptURL = "https://script.google.com/macros/s/AKfycbxjyJNWwkwHMkFP5far3_H_RYpojDo14bVI9g58mFrZbBIb0crosThdZJQHDNPRWOA/exec";
+
+async function addData(event, type) {
+  event.preventDefault();
+  const submitBtn = document.getElementById(`submit-${type}`);
+  const spinner = submitBtn.querySelector(".loading-spinner");
+  const text = submitBtn.querySelector(".submit-text");
+  spinner.classList.remove("hidden");
+  text.textContent = "Menyimpan...";
+
+  let formData = { type };
+  const inputs = document.querySelectorAll(`#form-${type} input, #form-${type} select, #form-${type} textarea`);
+  inputs.forEach(input => formData[input.id] = input.value);
+
+  try {
+    await fetch(scriptURL, { method: "POST", body: JSON.stringify(formData) });
+    alert("✅ Data berhasil disimpan");
+    document.querySelector(`#form-${type} form`).reset();
+  } catch (err) {
+    alert("❌ Gagal menyimpan data");
+    console.error(err);
+  } finally {
+    spinner.classList.add("hidden");
+    text.textContent = "Simpan";
+  }
+}
+</script>
+</body>
 </html>
